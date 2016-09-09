@@ -1,0 +1,179 @@
+<!--
+  ~ Levels Beyond CONFIDENTIAL
+  ~
+  ~ Copyright 2003 - 2016 Levels Beyond Incorporated
+  ~ All Rights Reserved.
+  ~
+  ~ NOTICE:  All information contained herein is, and remains
+  ~ the property of Levels Beyond Incorporated and its suppliers,
+  ~ if any.  The intellectual and technical concepts contained
+  ~ herein are proprietary to Levels Beyond Incorporated
+  ~ and its suppliers and may be covered by U.S. and Foreign Patents,
+  ~ patents in process, and are protected by trade secret or copyright law.
+  ~ Dissemination of this information or reproduction of this material
+  ~ is unlawful and strictly forbidden unless prior written permission is obtained
+  ~ from Levels Beyond Incorporated.
+  -->
+
+<workflow xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns="http://levelsbeyond.com/schema/workflow"
+    xsi:schemaLocation="http://levelsbeyond.com/schema/workflow http://www.levelsbeyond.com/schema/latest/studio.xsd"
+    id="addDeliverableAssets"
+    name="Add Deliverable Assets"
+    description=""
+    
+    executionLabelExpression="ID: addDeliverableAssets | Name: Add Deliverable Assets | Adding deliverables to collection ${collection}"
+    deadlineExpression=""
+    subjectDOClassName=""
+    showInUserInterface="true"
+    
+    
+    sdkVersion="5.4">
+    
+    <initialStepName>check if collection exists</initialStepName>
+    
+    
+    
+    <!-- ............................................. Handling Collection ............................................. -->
+    <!-- Check if collection exists -->
+    <queryStep name="check if collection exists" 
+        executionLabelExpression="Checking if the collection, ${collection}, exists already"
+        targetDataObjectClass="AssetCollection" 
+        resultDataDef="collectionObject">
+        <transition condition="${collectionObject != null}">
+            <targetStepName>create asset array</targetStepName>
+        </transition>
+        <transition condition="${true}">
+            <targetStepName>create collection</targetStepName>
+        </transition>
+        <criteria>
+            <![CDATA[
+                <criteria>
+                <and>
+                    <condition property="name" op="eq">
+                        <test value="${collection}" />
+                    </condition>
+                </and>
+            </criteria>
+            ]]>
+        </criteria>
+    </queryStep>
+    
+    
+    
+    <!-- Create Collection -->
+    <saveDataObjectStep name="create collection"
+        targetDataObjectClass="AssetCollection"
+        resultDataDef="collectionObject"
+        executionLabelExpression="Creating collection: ${collection}"
+        nextStep="create asset array"
+        >
+        
+        <property name="name">${collection}</property>
+    </saveDataObjectStep>
+
+
+
+
+
+    
+    <!-- ............................................ Create Array of Types ............................................ -->
+    <!-- Create Array of assets to create -->
+    <groovyStep name="create asset array" 
+        resultDataDef="typeArray"
+        executionLabelExpression="Building array of types to be sent for creating placeholders using values | Video ${numVideo} | Audio ${numAudio} | Image ${numImage} | Document ${numDoc} | Other ${numOther} |"
+        nextStep="create placeholder assets">
+        <script>
+            <![CDATA[
+                def arraySize = numVideo + numAudio + numImage + numDoc + numOther;
+                def buildArray = [];
+                
+                if( numVideo > 0 )
+                {
+                    for ( int v = 0; v < numVideo; v++)
+                    {
+                        buildArray.push("video");
+                    }
+                }
+                if( numAudio > 0 )
+                {
+                    for ( int a = 0; a < numAudio; a++)
+                    {
+                        buildArray.push("audio");
+                    }
+                }
+                if( numImage > 0 )
+                {
+                    for ( int i = 0; i < numImage; i++)
+                    {
+                        buildArray.push("image");
+                    }
+                }
+                if( numDoc > 0 )
+                {
+                    for ( int d = 0; d < numDoc; d++)
+                    {
+                        buildArray.push("document");
+                    }
+                }
+                if( numOther > 0 )
+                {
+                    for ( int o = 0; o < numVideo; o++)
+                    {
+                        buildArray.push("other");
+                    }
+                }
+                return buildArray;
+                
+            ]]>
+        </script>
+    </groovyStep>
+    
+    
+    
+    
+    
+    
+    <!-- ................................................ Create Assets ................................................ -->
+    <!-- Subflow -->
+    <executeSubflowStep name="create placeholder assets"
+        executionLabelExpression="Creating ${typeArray.size()} number of assets"
+        targetWorkflowId="createPlaceholderAsset"
+        subjectChangePath="${typeArray}"
+        subflowTargetDataDef="assetType"
+        nextStep="end">
+        
+        <subflowContextDataMapping parentDataDef="collectionObject" subflowDataDef="collection"/>
+        <subflowContextDataMapping parentDataDef="job" subflowDataDef="job"/>
+        <subflowContextDataMapping parentDataDef="providedOrDeliverable" subflowDataDef="providedOrDeliverable"/>
+    </executeSubflowStep>
+    
+    
+    
+    
+    
+    <!-- .................................................... End Step ................................................. -->
+    <noopStep name="end"/>
+    
+    
+    
+    
+    
+    
+    <!-- .............................................. Context Data Defs .............................................. -->
+    <!-- User Input -->
+    <contextDataDef name="collection"   label="Collection"                          dataType="String"   userInput="true" required="true"/>    
+    <contextDataDef name="numVideo" label="Number of Video Deliverables"            dataType="Integer"  userInput="true" defaultDataExpression="0"/>
+    <contextDataDef name="numAudio" label="Number of Audio Deliverables"            dataType="Integer"  userInput="true" defaultDataExpression="0"/>
+    <contextDataDef name="numImage" label="Number of Image Deliverables"            dataType="Integer"  userInput="true" defaultDataExpression="0"/>
+    <contextDataDef name="numDoc"   label="Number of Document Deliverables"         dataType="Integer"  userInput="true" defaultDataExpression="0"/>
+    <contextDataDef name="numOther" label="Number of Other Deliverables"            dataType="Integer"  userInput="true" defaultDataExpression="0"/>
+    
+    <!-- Default Values -->
+    <contextDataDef name="providedOrDeliverable"                                    dataType="String"                    defaultDataExpression="Deliverable"/>
+    <contextDataDef name="job"                                                      dataType="Boolean"      defaultDataExpression="false"/>
+    
+    <!-- Processing Data Defs -->
+    <contextDataDef name="collectionObject" dataType="Data Object"/>
+    <contextDataDef name="typeArray" dataType="String" multiple="true"/>
+</workflow>

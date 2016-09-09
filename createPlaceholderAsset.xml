@@ -1,0 +1,320 @@
+<!--
+  ~ Levels Beyond CONFIDENTIAL
+  ~
+  ~ Copyright 2003 - 2016 Levels Beyond Incorporated
+  ~ All Rights Reserved.
+  ~
+  ~ NOTICE:  All information contained herein is, and remains
+  ~ the property of Levels Beyond Incorporated and its suppliers,
+  ~ if any.  The intellectual and technical concepts contained
+  ~ herein are proprietary to Levels Beyond Incorporated
+  ~ and its suppliers and may be covered by U.S. and Foreign Patents,
+  ~ patents in process, and are protected by trade secret or copyright law.
+  ~ Dissemination of this information or reproduction of this material
+  ~ is unlawful and strictly forbidden unless prior written permission is obtained
+  ~ from Levels Beyond Incorporated.
+  -->
+
+<workflow xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns="http://levelsbeyond.com/schema/workflow"
+    xsi:schemaLocation="http://levelsbeyond.com/schema/workflow http://www.levelsbeyond.com/schema/latest/studio.xsd"
+    id="createPlaceholderAsset"
+    name="Create Placeholder Assets"
+    description=""
+    
+    executionLabelExpression="ID: createPlaceholderAsset | Name: Create Placeholder Assets | Creating a placeholder asset of type ${assetType}"
+    deadlineExpression=""
+    subjectDOClassName=""
+    showInUserInterface="true"
+    
+    
+    sdkVersion="5.4">
+    
+    <initialStepName>Set Source File Type</initialStepName>
+    
+    <!-- ...................................... Setting up Mock Source File ...................................... -->
+    <!-- Set mock file name based on file type passed in -->
+    <groovyStep name="Set Source File Type" resultDataDef="mockFile"
+        executionLabelExpression="Setting mock source file name according to type >>> ${assetType}">
+        <transition condition="${#fileExists(mockFile)}">
+            <targetStepName>choose placeholder name</targetStepName>
+        </transition>
+        <transition condition="${true}">
+            <targetStepName>create mock file</targetStepName>
+        </transition>
+        <script>
+            <![CDATA[
+                def typeString = assetType.toLowerCase();
+                def mockName;
+                
+                switch (typeString)
+                {
+                    case "video":
+                        mockName = "blank.mov";
+                        break;
+                    case "audio":
+                        mockName = "blank.aif";
+                        break;
+                    case "image":
+                        mockName = "blank.jpg";
+                        break;
+                    case "document":
+                        mockName = "blank.pdf";
+                        break;
+                    default:
+                        mockName = "blank.wrl";
+                        break;
+                }
+                def fullString = tempDir + "/" + mockName;
+                return fullString;
+            ]]>
+        </script>
+    </groovyStep>
+    
+    
+    
+    <!-- Create mock source file -->
+    <runCommandStep name="create mock file"
+        executionLabelExpression="Creating mock file >>> ${mockFile.absolutePath}"
+        executablePathExpression="/bin/touch">
+        <transition condition="${#fileExists(mockFile)}">
+            <targetStepName>choose placeholder name</targetStepName>
+        </transition>
+        <transition condition="${true}">
+            <targetStepName>no mock file</targetStepName>
+        </transition>
+        
+        <arg>${mockFile.absolutePath}</arg>
+    </runCommandStep>
+    
+    
+    
+    
+    
+    <!-- ........................................ Create Placeholder Asset ....................................... -->
+    <!-- Choose name for placeholder -->
+    <setContextData name="choose placeholder name"
+        executionLabelExpression="Setting placeholder name using a random number"
+        targetDataDef="placeholderName"
+        valueExpression="Placeholder_${todayString}_${#randomNumber(0,1000)}">
+        <transition condition="${assetType.toLowerCase().equals('video')}">
+            <targetStepName>check for existing placeholder timeline</targetStepName>
+        </transition>
+        <transition condition="${true}">
+            <targetStepName>check for existing placeholder asset</targetStepName>
+        </transition>
+    </setContextData>
+    
+    
+    
+    <!-- Check if that asset exists -->
+        <!-- loop back to new name if so -->
+    <queryStep name="check for existing placeholder asset" 
+        executionLabelExpression="Checking if the asset already exists"
+        targetDataObjectClass="AssetVersion" 
+        resultDataDef="queryResult">
+        <transition condition="${queryResult != null}">
+            <targetStepName>choose placeholder name</targetStepName>
+        </transition>
+        <transition condition="${true}">
+            <targetStepName>create placeholder asset</targetStepName>
+        </transition>
+        <criteria>
+            <![CDATA[
+                <criteria>
+                <and>
+                    <condition property="name" op="eq">
+                        <test value="${placeholderName}" />
+                    </condition>
+                </and>
+            </criteria>
+            ]]>
+        </criteria>
+    </queryStep>
+    
+    
+    
+    <!-- Check if that timeline exists -->
+    <!-- loop back to new name if so -->
+    <queryStep name="check for existing placeholder timeline" 
+        executionLabelExpression="Checking if the timeline already exists"
+        targetDataObjectClass="Timeline" 
+        resultDataDef="queryResult">
+        <transition condition="${queryResult != null}">
+            <targetStepName>choose placeholder name</targetStepName>
+        </transition>
+        <transition condition="${true}">
+            <targetStepName>create placeholder asset</targetStepName>
+        </transition>
+        <criteria>
+            <![CDATA[
+                <criteria>
+                <and>
+                    <condition property="name" op="eq">
+                        <test value="${placeholderName}" />
+                    </condition>
+                </and>
+            </criteria>
+            ]]>
+        </criteria>
+    </queryStep>
+    
+    
+    
+    <!-- Create placeholder asset --><!-- might need: assetExpression="${placeholderAsset}" -->
+    <saveAssetStep name="create placeholder asset"
+        executionLabelExpression="Creating Placeholder Asset >>> ${placeholderName}"
+        contentExpression="${mockFile}"
+        contentUseExpression="SOURCE|MEZZANINE"
+        versionAssetExpression="false"
+        resultDataDef="placeholderAsset"
+        assetNameExpression="${placeholderName}"
+        >
+        <transition condition="${assetType.toLowerCase().equals('video')}">
+            <targetStepName>create timeline</targetStepName>
+        </transition>
+        <transition condition="${true}">
+            <targetStepName>set placeholder data object</targetStepName>
+        </transition>
+    </saveAssetStep>
+    
+    
+    
+    <!-- Create timeline if asset is a video -->
+    <saveDataObjectStep name="create timeline"
+        targetDataObjectClass="Timeline"
+        resultDataDef="placeholderAsset">
+        <transition condition="${true}">
+            <targetStepName>Reindex</targetStepName>
+        </transition>
+        <property name="name">${placeholderAsset.name}</property>
+        <property name="type">VIDEO_TIMELINE</property>
+        <property name="timelineAssets">
+            <![CDATA[
+			{
+				_class: "TimelineAsset",
+				asset: "${placeholderAsset.masterAsset.toDataObjectRef().toString()}"				
+			}
+			]]>
+        </property>
+    </saveDataObjectStep>
+    
+    
+    
+    <setContextData name="set placeholder data object"
+        executionLabelExpression="Setting placeholder data def to hold assetMaster or Timeline"
+        targetDataDef="placeholderAsset"
+        valueExpression="${assetType.toLowerCase().equals('video')? placeholderAsset.masterAsset.timelineAssets[0].timeline : placeholderAsset.masterAsset}"
+        nextStep="Reindex"/>
+    
+    
+    
+    <raiseWorkflowEventStep name="Reindex"
+        eventTypeExpression="ensureIndexed"
+        executionLabelExpression="Ensure Asset Indexed" 
+        >
+        
+        <transition condition="${assetType.toLowerCase().equals('video')}">
+            <targetStepName>remove source from timeline</targetStepName>
+        </transition>
+        <transition condition="${true}">
+            <targetStepName>remove source from asset</targetStepName>
+        </transition>
+        <property name="indexTargetRef">${placeholderAsset}</property>   
+    </raiseWorkflowEventStep>
+
+
+
+
+
+
+
+    <!-- ........................................ Cleanup Mock Source File ....................................... -->
+    <!-- Remove source file from asset -->
+    <deleteDataObjectStep name="remove source from asset" 
+        dataObjectExpression="${placeholderAsset.mezzanine}"
+        nextStep="send asset to be processed"/>
+    
+    
+    
+    <!-- Remove source file from timeline -->
+    <deleteDataObjectStep name="remove source from timeline" 
+        dataObjectExpression="${placeholderAsset.mainMezzanineContent}"
+        nextStep="send asset to be processed"/>
+    
+    
+    
+    
+    
+    
+    
+    <!-- ..................................... Send Placeholder to Collection .................................... -->
+    <!-- Send asset name to subflow with: collection, asset, deliverable, job -->
+    <executeSubflowStep name="send asset to be processed" 
+        executionLabelExpression="Passing asset, ${placeholder.name}, to be processed"
+        targetWorkflowId="addAssetToCollectionForJob"
+        nextStep="end">
+        
+        <subflowContextDataMapping parentDataDef="collection" subflowDataDef="collection"/>
+        <subflowContextDataMapping parentDataDef="job" subflowDataDef="job"/>
+        <subflowContextDataMapping parentDataDef="providedOrDeliverable" subflowDataDef="providedOrDeliverable"/>
+        <subflowContextDataMapping parentDataDef="placeholderName" subflowDataDef="assetName"/>
+    </executeSubflowStep>
+    
+    
+    
+    
+    
+    
+    <!-- ................................................ End Steps ............................................... -->
+    <!-- Fail if mockFile doesn't exist -->
+    <failWorkflowStep name="no mock file" 
+        reasonExpression="The mock file, ${mockFile.absolutePath}, failed to be created"
+        executionLabelExpression="The mock file, ${mockFile.absolutePath}, failed to be created"/>
+    
+    
+    
+    <noopStep name="end"/>
+    
+    
+    
+    
+    
+    
+    <!-- ........................................... Context Data Defs ........................................... -->
+
+    <!-- User Input -->
+    <contextDataDef name="assetType"    label="Type of Asset to Create" dataType="String"       userInput="true" required="true"/>
+    <!-- collection to add an asset to -->
+    <contextDataDef name="collection"   label="Collection"              dataType="Data Object"  userInput="true" required="true">
+        <picklist>
+            <dataObjectSearch dataObjectClass="assetCollection">
+                <searchPath>name</searchPath>
+            </dataObjectSearch>
+        </picklist>
+    </contextDataDef>
+    <contextDataDef name="job" label="Does the Asset Have a Job?"       dataType="Boolean"      userInput="true" defaultDataExpression="false"/>
+    <contextDataDef name="providedOrDeliverable" label="Provided or Deliverable?" dataType="String" userInput="true" required="true">
+        <picklist>
+            <metadataProperty>providedOrDeliverable</metadataProperty>
+        </picklist>
+    </contextDataDef>
+    
+    
+    
+    <!-- Using Default Values -->
+    <contextDataDef name="tempDir"          dataType="String"   defaultDataExpression="${#sysconfig('filesystem.root.temp')}" />
+    <contextDataDef name="today"            dataType="Date"     defaultDataExpression="${#newDate()}"/>
+    <contextDataDef name="todayString"      dataType="String"   defaultDataExpression="${#formatDate('yyyyMMdd', today)}"/>
+    
+    
+    
+    <!-- Processing Data Defs -->
+    <contextDataDef name="mockFileName"     dataType="String"/>
+    <contextDataDef name="mockFile"         dataType="File"/>
+    <contextDataDef name="placeholderName"  dataType="String"/>
+    <contextDataDef name="queryResult"      dataType="Data Object"/>
+    <contextDataDef name="placeholderAsset" dataType="Data Object"/>
+
+    
+</workflow>

@@ -1,0 +1,269 @@
+<!--
+  ~ Levels Beyond CONFIDENTIAL
+  ~
+  ~ Copyright 2003 - 2016 Levels Beyond Incorporated
+  ~ All Rights Reserved.
+  ~
+  ~ NOTICE:  All information contained herein is, and remains
+  ~ the property of Levels Beyond Incorporated and its suppliers,
+  ~ if any.  The intellectual and technical concepts contained
+  ~ herein are proprietary to Levels Beyond Incorporated
+  ~ and its suppliers and may be covered by U.S. and Foreign Patents,
+  ~ patents in process, and are protected by trade secret or copyright law.
+  ~ Dissemination of this information or reproduction of this material
+  ~ is unlawful and strictly forbidden unless prior written permission is obtained
+  ~ from Levels Beyond Incorporated.
+  -->
+
+<workflow xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns="http://levelsbeyond.com/schema/workflow"
+    xsi:schemaLocation="http://levelsbeyond.com/schema/workflow http://www.levelsbeyond.com/schema/latest/studio.xsd"
+    id="addAssetToCollectionForJob"
+    name="Add Asset To Collection For Job"
+    description=""
+    
+    executionLabelExpression="ID addAssetToCollectionForJob | Name Add Asset To Collection For Job | Adding asset ${assetName} to collection ${collection.name}"
+    deadlineExpression=""
+    subjectDOClassName=""
+    showInUserInterface="true"
+    
+    
+    sdkVersion="5.4">
+    
+    <initialStepName>find asset</initialStepName>
+    
+    
+    
+    <!-- ........................................... Finding Asset ........................................... -->
+    <!-- Query for asset -->
+    <queryStep name="find asset" 
+        executionLabelExpression="Querying for the asset name >>> ${assetName}"
+        targetDataObjectClass="AssetVersion" 
+        resultDataDef="queryResult">
+        
+        <transition condition="${queryResult != null}">
+            <targetStepName>set asset master</targetStepName>
+        </transition>
+        <transition condition="${true}">
+            <targetStepName>find timeline</targetStepName>
+        </transition>
+        
+        <criteria>
+            <![CDATA[
+            <criteria>
+                <and>
+                    <condition property="name" op="eq" >
+                        <test value="${assetName}" />
+                    </condition>
+                    <condition property="masterAsset.assetType" op="noteq" >
+                        <test value="Video" />
+                    </condition>
+                </and>
+            </criteria>
+            ]]>
+        </criteria>
+    </queryStep>
+    
+    
+    
+    <queryStep name="find timeline" 
+        executionLabelExpression="Querying for the timeline name >>> ${assetName}"
+        targetDataObjectClass="Timeline" 
+        resultDataDef="queryResult">
+        
+        <transition condition="${queryResult != null}">
+            <targetStepName>set timeline</targetStepName>
+        </transition>
+        <transition condition="${true}">
+            <targetStepName>asset query failed</targetStepName>
+        </transition>
+        
+        <criteria>
+            <![CDATA[
+                <criteria>
+                <and>
+                    <condition property="name" op="eq">
+                        <test value="${assetName}" />
+                    </condition>
+                </and>
+            </criteria>
+            ]]>
+        </criteria>
+    </queryStep>
+    
+    
+    
+    
+    <!-- Set Asset Data Def -->
+    <setContextData name="set asset master"
+        executionLabelExpression="Setting the AssetMaster for the found asset >>> ${queryResult.name}"
+        targetDataDef="assetToAdd"
+        valueExpression="${queryResult.masterAsset}"
+        nextStep="test collection contents for asset"/>
+    
+    
+    
+    <!-- Set Asset Data Def -->
+    <setContextData name="set timeline"
+        executionLabelExpression="Setting the Timeline for the found asset >>> ${queryResult.name}"
+        targetDataDef="assetToAdd"
+        valueExpression="${queryResult}"
+        nextStep="test collection contents for timeline"/>    
+    
+    
+    
+    
+    
+    <!-- ........................................ Adding to Collection ....................................... -->
+    <!-- Test if the Asset is Already in the Collection -->
+    <queryStep 
+        name="test collection contents for asset"
+        executionLabelExpression="Verify that asset '${assetToAdd.name}' doesn't exist in the collection"
+        targetDataObjectClass="AssetCollectionItem"
+        resultDataDef="collectionItem">
+        <transition condition="${collectionItem != null}">
+            <targetStepName>set metadata on asset</targetStepName>
+        </transition>
+        <transition condition="${true}">
+            <targetStepName>add asset to collection</targetStepName>
+        </transition>
+        
+        <criteria>
+            <![CDATA[
+				<criteria>
+					<and>
+						<condition property="collection.id" op="eq">
+						      <test value="${collection.id}"/>
+						</condition>
+						<condition property="asset.id" op="eq">
+						      <test value="${assetToAdd.id}"/>
+						</condition>
+					</and>
+				</criteria>
+			]]>
+        </criteria>
+    </queryStep>
+    
+    
+    
+    <!-- Add Asset to the Collection -->
+    <saveDataObjectStep name="add asset to collection"
+        executionLabelExpression="Adding asset ${assetToAdd.name} to collection ${collection.name}"
+        targetDataObjectClass="AssetCollectionItem" 
+        resultDataDef="collectionItem"
+        nextStep="set metadata on asset">
+        
+        <property name="collection">${collection}</property>
+        <property name="asset">${assetToAdd}</property>
+        <property name="index">${collectionItemIndex}</property>
+    </saveDataObjectStep>
+    
+    
+    
+    <!-- Test if the Asset is Already in the Collection -->
+    <queryStep 
+        name="test collection contents for timeline"
+        executionLabelExpression="Verify that asset '${assetToAdd.name}' doesn't exist in the collection"
+        targetDataObjectClass="AssetCollectionItem"
+        resultDataDef="collectionItem">
+        <transition condition="${collectionItem != null}">
+            <targetStepName>set metadata on asset</targetStepName>
+        </transition>
+        <transition condition="${true}">
+            <targetStepName>add timeline to collection</targetStepName>
+        </transition>
+        
+        <criteria>
+            <![CDATA[
+				<criteria>
+					<and>
+						<condition property="collection.id" op="eq">
+						      <test value="${collection.id}"/>
+						</condition>
+						<condition property="timeline.id" op="eq">
+						      <test value="${assetToAdd.id}"/>
+						</condition>
+					</and>
+				</criteria>
+			]]>
+        </criteria>
+    </queryStep>
+    
+    
+    
+    <!-- Add Timeline to the Collection -->
+    <saveDataObjectStep name="add timeline to collection"
+        executionLabelExpression="Adding asset ${assetToAdd.name} to collection ${collection.name}"
+        targetDataObjectClass="AssetCollectionItem" 
+        resultDataDef="collectionItem"
+        nextStep="set metadata on asset">
+        
+        <property name="collection">${collection}</property>
+        <property name="timeline">${assetToAdd}</property>
+        <property name="index">${collectionItemIndex}</property>
+    </saveDataObjectStep>
+    
+    
+    
+    
+    
+    
+    <!-- ...................................... Add Metadata to Timeline ..................................... -->
+    <!-- Set provided metadata on asset -->
+    <saveDataObjectStep name="set metadata on asset"
+        executionLabelExpression="Setting Job >> ${job? 'true' : 'false'} | Provided or Deliverable >>> ${providedOrDeliverable}"
+        dataObjectExpression="${assetToAdd.metadata}"
+        nextStep="end">
+        
+        <property name="providedOrDeliverable">${providedOrDeliverable}</property>
+        <property name="job">${job}</property>
+    </saveDataObjectStep>
+    
+    
+    
+    
+    
+    
+    <!-- ........................................... Ending Steps ............................................ -->
+    <!-- Fail out if the asset wasn't found -->
+    <failWorkflowStep name="asset query failed" 
+        reasonExpression="Search for asset name ${assetName} was unsuccessful"
+        executionLabelExpression="Search for asset name ${assetName} was unsuccessful"/>
+    
+    
+    
+    <noopStep name="end"/>
+    
+    
+    
+    
+    
+    <!-- ......................................... Context Data Defs ......................................... -->
+    <!-- INPUT DATA DEFS -->
+    <!-- collection to add an asset to -->
+    <contextDataDef name="collection" label="Collection" dataType="Data Object" userInput="true" required="true">
+        <picklist>
+            <dataObjectSearch dataObjectClass="assetCollection">
+                <searchPath>name</searchPath>
+            </dataObjectSearch>
+        </picklist>
+    </contextDataDef>
+    <contextDataDef name="assetName" label="Name of Asset" dataType="String" userInput="true" required="true"/>
+    <contextDataDef name="job" label="Does the Asset Have a Job?" dataType="Boolean" userInput="true" defaultDataExpression="false"/>
+    <contextDataDef name="providedOrDeliverable" label="Provided or Deliverable?" dataType="String" userInput="true" required="true">
+        <picklist>
+            <metadataProperty>providedOrDeliverable</metadataProperty>
+        </picklist>
+    </contextDataDef>
+    
+    <!-- PROCESSING DATA DEFS -->
+    <!-- Result to check if the asset exists -->
+    <contextDataDef name="queryResult" dataType="Data Object"/>
+    <!-- Asset Data Object for the asset to add -->
+    <contextDataDef name="assetToAdd" dataType="Data Object"/>
+    <!-- For checking if the asset is already in the collection -->
+    <contextDataDef name="collectionItem" dataType="Data Object"/>
+    <contextDataDef name="collectionItemIndex" dataType="Integer" defaultDataExpression="${collection?.items?.size() + 1}"/>
+    
+    
+</workflow>
